@@ -36,9 +36,14 @@ final class AppModel {
 
     private(set) var services: [VPNService] = []
     private(set) var loaded = false
+    /// Список VPN не удалось прочитать (scutil не отвечает или изменился формат вывода).
+    private(set) var loadFailed = false
     private(set) var session: SessionStats?
     private(set) var store = StatsStore()
     private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
+        || SMAppService.mainApp.status == .requiresApproval
+    /// Автозапуск включён, но ждёт подтверждения в «Системных настройках».
+    private(set) var launchNeedsApproval = SMAppService.mainApp.status == .requiresApproval
     private(set) var blink = false
     var panelOpen = false {
         didSet { if panelOpen { kick() } }
@@ -57,6 +62,7 @@ final class AppModel {
     @ObservationIgnored private var meter = TrafficMeter()
     @ObservationIgnored private var refreshing = false
     @ObservationIgnored private var refreshQueued = false
+    @ObservationIgnored private var listFailures = 0
     @ObservationIgnored private var secondsSinceRefresh = 0
     @ObservationIgnored private var lastSample: Date?
     @ObservationIgnored private var lastSave = Date()
@@ -96,11 +102,21 @@ final class AppModel {
         services.filter { $0.status == .connected }.map(\.id)
     }
 
+    /// Панель реально на экране: у приложения есть видимое окно выше строки меню.
+    private var panelVisible: Bool {
+        NSApp.windows.contains { $0.isVisible && $0.frame.height > 100 }
+    }
+
     /// Раз в секунду: решает, пора ли опрашивать систему. Панель открыта или идёт переключение —
-    /// каждую секунду; VPN включён — раз в 5 с (замер трафика); иначе раз в 3 с плюс уведомления сети.
+    /// каждую секунду; иначе раз в 5 с плюс мгновенное обновление по уведомлениям сети.
     private func tick() async {
+        // Признак «панель открыта» сверяется с окнами: если событие закрытия не пришло,
+        // частый опрос не должен остаться включённым навсегда.
+        let visible = panelVisible
+        if panelOpen != visible { panelOpen = visible }
+
         secondsSinceRefresh += 1
-        let period = (panelOpen || isTransitional) ? 1 : (connectedIDs.isEmpty ? 3 : 5)
+        let period = (panelOpen || isTransitional) ? 1 : 5
         if secondsSinceRefresh >= period { await refresh() }
 
         if isTransitional {
@@ -132,10 +148,18 @@ final class AppModel {
             refreshQueued = false
             secondsSinceRefresh = 0
             let result = await VPNControl.list()
-            if result.code == 0 {
-                apply(ScutilParser.parseList(result.output), now: Date())
+            let list = ScutilParser.parseList(result.output)
+            let unreadable = result.code != 0 || (list.isEmpty && ScutilParser.mentionsServices(result.output))
+            if unreadable {
+                // Один сбой не меняет картину; после двух подряд показываем ошибку чтения.
+                listFailures += 1
+                if listFailures >= 2, !loadFailed { loadFailed = true }
+            } else {
+                listFailures = 0
+                if loadFailed { loadFailed = false }
+                apply(list, now: Date())
             }
-            loaded = true
+            if !loaded { loaded = true }
         } while refreshQueued
     }
 
@@ -218,11 +242,7 @@ final class AppModel {
 
     // MARK: - Значок
 
-    private static let iconPreview = ProcessInfo.processInfo.environment["SINVPN_ICON_PREVIEW"]
-
     var menuBarImage: NSImage {
-        // Только для скриншотов в CI: SINVPN_ICON_PREVIEW=on показывает залитый значок.
-        if Self.iconPreview == "on" { return MenuBarIcon.on }
         if services.contains(where: { $0.status == .connected }) { return MenuBarIcon.on }
         if isTransitional { return blink ? MenuBarIcon.dim : MenuBarIcon.off }
         return MenuBarIcon.off
@@ -267,7 +287,7 @@ final class AppModel {
         session?.tx += delta.tx
         store.add(seconds: elapsed, rx: delta.rx, tx: delta.tx, at: now)
         dirty = true
-        if now.timeIntervalSince(lastSave) >= 60 { save() }
+        if now.timeIntervalSince(lastSave) >= 15 { save() }
     }
 
     func resetStats() {
@@ -306,7 +326,13 @@ final class AppModel {
         } catch {
             NSLog("SinVpn: автозапуск: \(error.localizedDescription)")
         }
-        launchAtLogin = SMAppService.mainApp.status == .enabled
+        let status = SMAppService.mainApp.status
+        launchAtLogin = status == .enabled || status == .requiresApproval
+        launchNeedsApproval = status == .requiresApproval
+    }
+
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 
     func openVPNSettings() {

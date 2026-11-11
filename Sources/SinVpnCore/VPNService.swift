@@ -39,6 +39,16 @@ public enum ScutilParser {
         pattern: #"^(\*|\s)\s*\(([^)]*)\)\s+([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\s+(.*?)\s*"(.*)"\s*(?:\[.*\])?\s*$"#
     )
 
+    private static let uuid = try! NSRegularExpression(
+        pattern: #"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}"#
+    )
+
+    /// В выводе есть идентификаторы служб. Если при этом `parseList` ничего не разобрал,
+    /// значит, изменился формат вывода — это ошибка чтения, а не «VPN не настроен».
+    public static func mentionsServices(_ output: String) -> Bool {
+        uuid.firstMatch(in: output, range: NSRange(output.startIndex..., in: output)) != nil
+    }
+
     public static func parseList(_ output: String) -> [VPNService] {
         var result: [VPNService] = []
         var seen = Set<String>()

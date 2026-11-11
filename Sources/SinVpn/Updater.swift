@@ -125,6 +125,9 @@ final class Updater {
             request.timeoutInterval = 20
             let (data, response) = try await UpdateNetwork.session.data(for: request)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            // Проверка засчитывается только при внятном ответе: после сбоя (например, лимита
+            // запросов) следующая автопроверка не откладывается на сутки.
+            guard code == 200 || code == 404 else { throw ReleaseFeedError.invalidResponse }
             lastCheck = Date()
             UserDefaults.standard.set(lastCheck, forKey: Keys.lastCheck)
             // 404 — в репозитории ещё нет ни одного релиза.
@@ -132,7 +135,6 @@ final class Updater {
                 state = .upToDate
                 return
             }
-            guard code == 200 else { throw ReleaseFeedError.invalidResponse }
             let release = try ReleaseFeed.parse(data)
             let newer = currentVersion.map { release.version > $0 } ?? true
             state = newer ? .available(release) : .upToDate
@@ -200,9 +202,9 @@ final class Updater {
     private func install(_ release: ReleaseInfo) async {
         UpdateLog.write("— Обновление \(currentVersionString) → \(release.version), бандл \(Self.installURL.path)")
         state = .downloading(release, 0)
+        let work = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SinVpn-update-\(UUID().uuidString)", isDirectory: true)
         do {
-            let work = FileManager.default.temporaryDirectory
-                .appendingPathComponent("SinVpn-update-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
             let archive = work.appendingPathComponent(ReleaseFeed.archiveName)
 
@@ -241,6 +243,7 @@ final class Updater {
             exit(0)
         } catch {
             UpdateLog.write("Ошибка: \(error.localizedDescription)")
+            try? FileManager.default.removeItem(at: work)
             state = .failed(error.localizedDescription + "\nЖурнал: ~/Library/Logs/SinVpn/update.log", release)
         }
     }

@@ -27,9 +27,12 @@ enum Shell {
                 }
                 let timedOut = Flag()
                 let killer = DispatchWorkItem {
-                    if process.isRunning {
-                        timedOut.set()
-                        process.terminate()
+                    guard process.isRunning else { return }
+                    timedOut.set()
+                    process.terminate()
+                    // Если процесс игнорирует мягкое завершение — через 2 с завершаем принудительно.
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
                     }
                 }
                 DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)

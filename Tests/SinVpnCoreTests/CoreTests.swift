@@ -37,6 +37,18 @@ final class ScutilParserTests: XCTestCase {
     }
 }
 
+final class ScutilFormatTests: XCTestCase {
+    func testDetectsUnknownFormat() {
+        let empty = "Available network connection services in the current set (*=enabled):\n"
+        XCTAssertFalse(ScutilParser.mentionsServices(empty))
+        XCTAssertFalse(ScutilParser.mentionsServices(""))
+        // Формат изменился: службы есть, но строка не разбирается.
+        let changed = "service 1A2B3C4D-0000-1111-2222-333344445555 name=Work state=up\n"
+        XCTAssertTrue(ScutilParser.parseList(changed).isEmpty)
+        XCTAssertTrue(ScutilParser.mentionsServices(changed))
+    }
+}
+
 final class ConnectAttemptTests: XCTestCase {
     let t0 = Date(timeIntervalSince1970: 1_000_000)
 

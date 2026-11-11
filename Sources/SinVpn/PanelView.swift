@@ -40,6 +40,15 @@ struct PanelView: View {
     @ViewBuilder private var vpnBlock: some View {
         if !model.loaded {
             ProgressView().controlSize(.small)
+        } else if model.loadFailed {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Не удалось прочитать список VPN")
+                Text("Система не вернула список подключений. Управлять VPN можно в «Системных настройках».")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Открыть настройки VPN") { model.openVPNSettings() }
+            }
         } else if model.services.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("VPN не настроен").foregroundStyle(.secondary)
@@ -154,6 +163,16 @@ struct PanelView: View {
                 get: { model.launchAtLogin },
                 set: { model.setLaunchAtLogin($0) }
             ))
+            if model.launchNeedsApproval {
+                HStack(spacing: 8) {
+                    Text("Автозапуск ждёт разрешения в «Объектах входа»")
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Button("Открыть") { model.openLoginItemsSettings() }
+                        .buttonStyle(.link)
+                }
+            }
             switchRow("Проверять обновления автоматически", isOn: Binding(
                 get: { updater.autoCheck },
                 set: { updater.autoCheck = $0 }
