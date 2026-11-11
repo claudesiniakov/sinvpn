@@ -244,10 +244,12 @@ private struct VPNRow: View {
                 HStack(spacing: 5) {
                     if state.isBusy {
                         ProgressView().controlSize(.mini)
+                    } else if let dot = dotColor {
+                        Circle().fill(dot).frame(width: 7, height: 7)
                     }
                     Text(state.title)
-                        .font(.caption)
-                        .foregroundStyle(statusColor)
+                        .font(.subheadline)
+                        .foregroundStyle(state == .off ? Color.secondary : Color.primary)
                 }
             }
             Spacer(minLength: 0)
@@ -258,12 +260,12 @@ private struct VPNRow: View {
         }
     }
 
-    /// Синий оставлен только интерактивным элементам; «Подключено» — зелёным.
-    private var statusColor: Color {
+    /// Состояние передаёт цветная точка, а текст остаётся контрастным на любом фоне панели.
+    private var dotColor: Color? {
         switch state {
         case .on: return .green
         case .failed: return .red
-        default: return .secondary
+        default: return nil
         }
     }
 }
