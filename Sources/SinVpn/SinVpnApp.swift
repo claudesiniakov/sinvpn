@@ -41,12 +41,12 @@ enum MenuBarIcon {
     static let on = make(filled: true, alpha: 1)
 
     private static func make(filled: Bool, alpha: CGFloat) -> NSImage {
-        let size = NSSize(width: 29, height: 16)
+        let size = NSSize(width: 28, height: 15)
         let image = NSImage(size: size, flipped: false) { rect in
             let color = NSColor.black.withAlphaComponent(alpha)
-            let kern: CGFloat = 0.7
+            let kern: CGFloat = 1.0
             let text = NSAttributedString(string: "VPN", attributes: [
-                .font: NSFont.systemFont(ofSize: 9.5, weight: .heavy),
+                .font: NSFont.systemFont(ofSize: 8.5, weight: .bold),
                 .kern: kern,
                 .foregroundColor: color,
             ])
@@ -62,8 +62,8 @@ enum MenuBarIcon {
                 text.draw(at: origin)
                 NSGraphicsContext.current?.compositingOperation = .sourceOver
             } else {
-                let frame = NSBezierPath(roundedRect: rect.insetBy(dx: 0.75, dy: 0.75), xRadius: 4, yRadius: 4)
-                frame.lineWidth = 1.5
+                let frame = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4.5, yRadius: 4.5)
+                frame.lineWidth = 1
                 color.setStroke()
                 frame.stroke()
                 text.draw(at: origin)

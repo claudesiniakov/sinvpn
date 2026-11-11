@@ -218,7 +218,11 @@ final class AppModel {
 
     // MARK: - Значок
 
+    private static let iconPreview = ProcessInfo.processInfo.environment["SINVPN_ICON_PREVIEW"]
+
     var menuBarImage: NSImage {
+        // Только для скриншотов в CI: SINVPN_ICON_PREVIEW=on показывает залитый значок.
+        if Self.iconPreview == "on" { return MenuBarIcon.on }
         if services.contains(where: { $0.status == .connected }) { return MenuBarIcon.on }
         if isTransitional { return blink ? MenuBarIcon.dim : MenuBarIcon.off }
         return MenuBarIcon.off

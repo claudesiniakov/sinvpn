@@ -41,6 +41,11 @@ jobs:
           if kill -0 $PID 2>/dev/null; then
             echo "Процесс жив через 10 с"
             kill $PID
+            SINVPN_ICON_PREVIEW=on build/SinVpn.app/Contents/MacOS/SinVpn > /dev/null 2>&1 &
+            PID2=$!
+            sleep 6
+            screencapture -x build/screen-on.png || true
+            kill $PID2 || true
           else
             wait $PID || echo "Код выхода: $?"
             cat smoke.log
@@ -56,6 +61,7 @@ jobs:
             build/SinVpn.zip
             build/SinVpn.zip.sha256
             build/screen.png
+            build/screen-on.png
 
       - name: Release notes from tag message
         if: startsWith(github.ref, 'refs/tags/v')

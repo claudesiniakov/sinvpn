@@ -1,10 +1,11 @@
 import SwiftUI
 import SinVpnCore
 
-/// Выпадающая панель: блок переключателей VPN, блок статистики и нижняя строка.
+/// Выпадающая панель: блок переключателей VPN, блок статистики и нижние строки.
 struct PanelView: View {
     @Environment(AppModel.self) private var model
     @Environment(Updater.self) private var updater
+    @State private var settingsOpen = false
     @State private var confirmReset = false
 
     var body: some View {
@@ -18,10 +19,11 @@ struct PanelView: View {
             footer
         }
         .padding(12)
-        .frame(width: 320)
+        .frame(width: 340)
         .onAppear { model.panelOpen = true }
         .onDisappear {
             model.panelOpen = false
+            settingsOpen = false
             confirmReset = false
         }
     }
@@ -61,53 +63,34 @@ struct PanelView: View {
         let session = model.session
         let today = model.today
         let month = model.month
-        return VStack(alignment: .leading, spacing: 8) {
-            Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 5) {
-                GridRow {
-                    Text("").gridColumnAlignment(.leading)
-                    head("Сессия")
-                    head("Сегодня")
-                    head("30 дней")
-                }
-                GridRow {
-                    label("Время")
-                    value(session.map { DurationFormat.clock(Int($0.seconds.rounded())) })
-                    value(DurationFormat.short(Int(today.seconds)))
-                    value(DurationFormat.short(Int(month.seconds)))
-                }
-                GridRow {
-                    label("Принято")
-                    value(session.map { ByteFormat.string($0.rx) })
-                    value(ByteFormat.string(today.rx))
-                    value(ByteFormat.string(month.rx))
-                }
-                GridRow {
-                    label("Отправлено")
-                    value(session.map { ByteFormat.string($0.tx) })
-                    value(ByteFormat.string(today.tx))
-                    value(ByteFormat.string(month.tx))
-                }
+        return Grid(alignment: .trailing, horizontalSpacing: 10, verticalSpacing: 5) {
+            GridRow {
+                Text("").gridColumnAlignment(.leading)
+                head("Сессия")
+                head("Сегодня")
+                head("30 дней")
             }
-            .font(.callout)
-            .monospacedDigit()
-
-            if confirmReset {
-                HStack(spacing: 8) {
-                    Text("Обнулить все показатели?").font(.callout)
-                    Spacer(minLength: 0)
-                    Button("Сбросить", role: .destructive) {
-                        model.resetStats()
-                        confirmReset = false
-                    }
-                    Button("Отмена") { confirmReset = false }
-                }
-                .controlSize(.small)
-            } else {
-                Button("Сбросить статистику") { confirmReset = true }
-                    .buttonStyle(.link)
-                    .font(.callout)
+            GridRow {
+                label("Время")
+                value(session.map { DurationFormat.clock(Int($0.seconds.rounded())) }, primary: true)
+                value(DurationFormat.short(Int(today.seconds)))
+                value(DurationFormat.short(Int(month.seconds)))
+            }
+            GridRow {
+                label("Принято")
+                value(session.map { ByteFormat.string($0.rx) }, primary: true)
+                value(ByteFormat.string(today.rx))
+                value(ByteFormat.string(month.rx))
+            }
+            GridRow {
+                label("Отправлено")
+                value(session.map { ByteFormat.string($0.tx) }, primary: true)
+                value(ByteFormat.string(today.tx))
+                value(ByteFormat.string(month.tx))
             }
         }
+        .font(.callout)
+        .monospacedDigit()
     }
 
     private func head(_ text: String) -> some View {
@@ -117,19 +100,56 @@ struct PanelView: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
+    /// Подпись строки никогда не обрезается: ширину уступают колонки значений.
     private func label(_ text: String) -> some View {
-        Text(text).foregroundStyle(.secondary)
+        Text(text)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize()
     }
 
-    private func value(_ text: String?) -> some View {
+    /// Колонка текущей сессии выделена, итоги за периоды — обычным начертанием.
+    private func value(_ text: String?, primary: Bool = false) -> some View {
         Text(text ?? "—")
+            .fontWeight(primary ? .semibold : .regular)
             .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
-    // MARK: - Нижняя строка
+    // MARK: - Нижние строки
 
     private var footer: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // Новая версия или идущая установка видны всегда, без раскрытия настроек.
+            if updater.needsAttention {
+                updateRow.padding(.bottom, 4)
+            }
+            MenuRow(action: { settingsOpen.toggle() }) {
+                Text("Настройки")
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(settingsOpen ? 90 : 0))
+            }
+            if settingsOpen {
+                settings
+                    .padding(.leading, 10)
+                    .padding(.vertical, 6)
+            }
+            MenuRow(action: { model.openVPNSettings() }) {
+                Text("Настройки VPN…")
+                Spacer(minLength: 0)
+            }
+            MenuRow(action: { model.quit() }) {
+                Text("Выйти")
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var settings: some View {
         VStack(alignment: .leading, spacing: 8) {
             switchRow("Запускать при входе в систему", isOn: Binding(
                 get: { model.launchAtLogin },
@@ -139,21 +159,42 @@ struct PanelView: View {
                 get: { updater.autoCheck },
                 set: { updater.autoCheck = $0 }
             ))
-            HStack(spacing: 8) {
-                Text(updater.statusLine)
-                    .monospacedDigit()
-                    .foregroundStyle(updater.isFailed ? Color.red : Color.secondary)
-                    .help(updater.failureDetails ?? "")
-                Spacer(minLength: 0)
-                if let action = updater.actionTitle {
-                    Button(action) { updater.primaryAction() }
-                        .buttonStyle(.link)
-                }
+            if !updater.needsAttention {
+                updateRow
             }
-            .font(.callout)
-            menuButton("Настройки VPN…") { model.openVPNSettings() }
-            menuButton("Выйти") { model.quit() }
+            if confirmReset {
+                HStack(spacing: 8) {
+                    Text("Обнулить всю статистику?")
+                    Spacer(minLength: 0)
+                    Button("Сбросить", role: .destructive) {
+                        model.resetStats()
+                        confirmReset = false
+                    }
+                    Button("Отмена") { confirmReset = false }
+                }
+                .controlSize(.small)
+            } else {
+                Button("Сбросить статистику…") { confirmReset = true }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .font(.callout)
+    }
+
+    private var updateRow: some View {
+        HStack(spacing: 8) {
+            Text(updater.statusLine)
+                .monospacedDigit()
+                .foregroundStyle(updater.isFailed ? Color.red : Color.primary)
+                .help(updater.failureDetails ?? "")
+            Spacer(minLength: 0)
+            if let action = updater.actionTitle {
+                Button(action) { updater.primaryAction() }
+                    .buttonStyle(.link)
+            }
+        }
+        .font(.callout)
     }
 
     private func switchRow(_ text: String, isOn: Binding<Bool>) -> some View {
@@ -163,14 +204,29 @@ struct PanelView: View {
         .toggleStyle(.switch)
         .controlSize(.mini)
     }
+}
 
-    private func menuButton(_ text: String, action: @escaping () -> Void) -> some View {
+/// Строка-кнопка, как в системных меню: подсвечивается при наведении.
+private struct MenuRow<Content: View>: View {
+    let action: () -> Void
+    @ViewBuilder let content: () -> Content
+    @State private var hovering = false
+
+    var body: some View {
         Button(action: action) {
-            Text(text)
+            HStack(spacing: 6) { content() }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.primary.opacity(hovering ? 0.1 : 0))
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, -6)
+        .onHover { hovering = $0 }
     }
 }
 
@@ -202,9 +258,10 @@ private struct VPNRow: View {
         }
     }
 
+    /// Синий оставлен только интерактивным элементам; «Подключено» — зелёным.
     private var statusColor: Color {
         switch state {
-        case .on: return .accentColor
+        case .on: return .green
         case .failed: return .red
         default: return .secondary
         }

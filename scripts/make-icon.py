@@ -29,9 +29,9 @@ def main(out):
 
     # Рамка и слово VPN.
     white = (244, 248, 248, 255)
-    fx, fy = 205 * S, 350 * S
-    d.rounded_rectangle([fx, fy, N - fx, N - fy], radius=92 * S, outline=white, width=44 * S)
-    font = ImageFont.truetype(FONT, 215 * S)
+    fx, fy = 215 * S, 362 * S
+    d.rounded_rectangle([fx, fy, N - fx, N - fy], radius=100 * S, outline=white, width=26 * S)
+    font = ImageFont.truetype(FONT, 190 * S)
     box = d.textbbox((0, 0), "VPN", font=font)
     w, h = box[2] - box[0], box[3] - box[1]
     d.text(((N - w) / 2 - box[0], (N - h) / 2 - box[1]), "VPN", font=font, fill=white)

@@ -151,8 +151,8 @@ final class StatsStoreTests: XCTestCase {
 
 final class FormattingTests: XCTestCase {
     func testBytes() {
-        XCTAssertEqual(ByteFormat.string(0), "0,0 КБ")
-        XCTAssertEqual(ByteFormat.string(512_000), "512,0 КБ")
+        XCTAssertEqual(ByteFormat.string(0), "0 КБ")
+        XCTAssertEqual(ByteFormat.string(512_000), "512 КБ")
         XCTAssertEqual(ByteFormat.string(27_900_000), "27,9 МБ")
         XCTAssertEqual(ByteFormat.string(1_400_000_000), "1,4 ГБ")
     }

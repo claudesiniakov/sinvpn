@@ -72,6 +72,14 @@ final class Updater {
         }
     }
 
+    /// Есть новая версия или идёт установка — строку обновления нужно показать вне настроек.
+    var needsAttention: Bool {
+        switch state {
+        case .available, .downloading, .installing, .failed(_, .some(_)): return true
+        case .idle, .checking, .upToDate, .failed(_, .none): return false
+        }
+    }
+
     var isFailed: Bool {
         if case .failed = state { return true }
         return false

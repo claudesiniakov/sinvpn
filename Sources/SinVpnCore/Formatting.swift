@@ -1,12 +1,12 @@
 import Foundation
 
-/// Объём трафика: КБ / МБ / ГБ, одна цифра после запятой («1,4 ГБ»).
+/// Объём трафика: МБ и ГБ — с одной цифрой после запятой («1,4 ГБ»), КБ — целые («810 КБ»).
 public enum ByteFormat {
     public static func string(_ bytes: UInt64) -> String {
         let b = Double(bytes)
         if b >= 1e9 { return number(b / 1e9) + " ГБ" }
         if b >= 1e6 { return number(b / 1e6) + " МБ" }
-        return number(b / 1e3) + " КБ"
+        return String(Int((b / 1e3).rounded())) + " КБ"
     }
 
     static func number(_ value: Double) -> String {
