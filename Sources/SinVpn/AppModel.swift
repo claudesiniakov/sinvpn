@@ -40,10 +40,7 @@ final class AppModel {
     private(set) var loadFailed = false
     private(set) var session: SessionStats?
     private(set) var store = StatsStore()
-    private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
-        || SMAppService.mainApp.status == .requiresApproval
-    /// Автозапуск включён, но ждёт подтверждения в «Системных настройках».
-    private(set) var launchNeedsApproval = SMAppService.mainApp.status == .requiresApproval
+    private(set) var launchAtLogin = LoginItem.isEnabled
     private(set) var blink = false
     var panelOpen = false {
         didSet { if panelOpen { kick() } }
@@ -79,6 +76,7 @@ final class AppModel {
         guard loopTask == nil else { return }
         store = StatsStore.load(from: Self.statsURL)
         store.prune(now: Date())
+        migrateLoginItem()
         updater.beforeRestart = { [weak self] in self?.flush() }
         watcher = NetworkWatcher {
             Task { @MainActor in AppModel.shared.kick() }
@@ -319,20 +317,29 @@ final class AppModel {
     func setLaunchAtLogin(_ enabled: Bool) {
         do {
             if enabled {
-                try SMAppService.mainApp.register()
+                try LoginItem.enable()
             } else {
-                try SMAppService.mainApp.unregister()
+                try LoginItem.disable()
             }
         } catch {
             NSLog("SinVpn: автозапуск: \(error.localizedDescription)")
         }
-        let status = SMAppService.mainApp.status
-        launchAtLogin = status == .enabled || status == .requiresApproval
-        launchNeedsApproval = status == .requiresApproval
+        launchAtLogin = LoginItem.isEnabled
     }
 
-    func openLoginItemsSettings() {
-        SMAppService.openSystemSettingsLoginItems()
+    /// До версии 1.0.5 автозапуск регистрировался через SMAppService. Такая запись привязана
+    /// к подписи приложения, а подпись без сертификата разработчика меняется с каждой версией,
+    /// поэтому после обновления система переставала запускать приложение. Переносим включённый
+    /// автозапуск на агент запуска и поправляем путь, если приложение переместили.
+    private func migrateLoginItem() {
+        let legacy = SMAppService.mainApp.status
+        if legacy == .enabled || legacy == .requiresApproval {
+            try? LoginItem.enable()
+            try? SMAppService.mainApp.unregister()
+        } else {
+            LoginItem.repairIfMoved()
+        }
+        launchAtLogin = LoginItem.isEnabled
     }
 
     func openVPNSettings() {

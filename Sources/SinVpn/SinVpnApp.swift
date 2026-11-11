@@ -22,6 +22,13 @@ struct SinVpnApp: App {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Второй экземпляр не нужен: в строке меню появился бы второй значок.
+        let me = ProcessInfo.processInfo.processIdentifier
+        if let id = Bundle.main.bundleIdentifier,
+           NSRunningApplication.runningApplications(withBundleIdentifier: id).contains(where: { $0.processIdentifier != me }) {
+            NSApp.terminate(nil)
+            return
+        }
         AppModel.shared.start()
     }
 

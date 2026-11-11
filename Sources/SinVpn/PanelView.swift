@@ -163,16 +163,6 @@ struct PanelView: View {
                 get: { model.launchAtLogin },
                 set: { model.setLaunchAtLogin($0) }
             ))
-            if model.launchNeedsApproval {
-                HStack(spacing: 8) {
-                    Text("Автозапуск ждёт разрешения в «Объектах входа»")
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    Button("Открыть") { model.openLoginItemsSettings() }
-                        .buttonStyle(.link)
-                }
-            }
             switchRow("Проверять обновления автоматически", isOn: Binding(
                 get: { updater.autoCheck },
                 set: { updater.autoCheck = $0 }
