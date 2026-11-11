@@ -59,7 +59,8 @@ final class Updater {
         case let .available(release): return version + " · доступна \(release.version)"
         case let .downloading(release, percent): return "Загрузка \(release.version)… \(percent) %"
         case .installing: return "Перезапуск…"
-        case .failed: return "Не удалось обновить"
+        case let .failed(message, _):
+            return "Не удалось обновить: " + (message.split(separator: "\n").first.map(String.init) ?? "")
         }
     }
 
@@ -149,17 +150,45 @@ final class Updater {
 
     // MARK: - Установка
 
-    /// Установка возможна только из собранного .app с правом записи в его папку.
-    var canInstallInPlace: Bool {
-        let bundle = Bundle.main.bundleURL
-        guard bundle.pathExtension == "app", currentVersion != nil else { return false }
-        return FileManager.default.isWritableFile(atPath: bundle.deletingLastPathComponent().path)
+    /// Настоящее расположение бандла. Приложение, запущенное из карантина (например, прямо из
+    /// «Загрузок»), система выполняет из временной копии только для чтения (App Translocation) —
+    /// обновлять нужно исходный бандл, а не её.
+    static let installURL: URL = {
+        let running = Bundle.main.bundleURL
+        guard running.path.contains("/AppTranslocation/") else { return running }
+        typealias Resolver = @convention(c) (CFURL, UnsafeMutablePointer<Unmanaged<CFError>?>?) -> Unmanaged<CFURL>?
+        guard let security = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY),
+              let symbol = dlsym(security, "SecTranslocateCreateOriginalPathForURL") else { return running }
+        let resolve = unsafeBitCast(symbol, to: Resolver.self)
+        guard let original = resolve(running as CFURL, nil)?.takeRetainedValue() else { return running }
+        return original as URL
+    }()
+
+    /// Почему установка на месте невозможна; nil — можно устанавливать.
+    var installBlocker: String? {
+        let bundle = Self.installURL
+        if bundle.pathExtension != "app" || currentVersion == nil {
+            return "Приложение запущено не из собранного SinVpn.app"
+        }
+        if bundle.path.contains("/AppTranslocation/") {
+            return "Перенесите SinVpn в «Программы» через Finder и запустите оттуда"
+        }
+        let folder = bundle.deletingLastPathComponent().path
+        if !FileManager.default.isWritableFile(atPath: folder) {
+            return "Нет права записи в папку \(folder)"
+        }
+        return nil
     }
 
     private func startInstall(_ release: ReleaseInfo) {
         guard installTask == nil else { return }
-        guard canInstallInPlace else {
-            NSWorkspace.shared.open(release.pageURL)
+        if let blocker = installBlocker {
+            // Не уводим молча на сайт: показываем причину, страница релиза — по «Повторить».
+            UpdateLog.write("Установка невозможна: \(blocker); бандл \(Self.installURL.path)")
+            if case .failed(_, .some) = state {
+                NSWorkspace.shared.open(release.pageURL)
+            }
+            state = .failed(blocker + ". Кнопка «Повторить» откроет страницу релиза.", release)
             return
         }
         installTask = Task {
@@ -169,7 +198,7 @@ final class Updater {
     }
 
     private func install(_ release: ReleaseInfo) async {
-        UpdateLog.write("— Обновление \(currentVersionString) → \(release.version), бандл \(Bundle.main.bundleURL.path)")
+        UpdateLog.write("— Обновление \(currentVersionString) → \(release.version), бандл \(Self.installURL.path)")
         state = .downloading(release, 0)
         do {
             let work = FileManager.default.temporaryDirectory
@@ -329,6 +358,7 @@ final class Updater {
         if mv "$OLD" "$BACKUP"; then
           if mv "$NEW" "$OLD" || ditto "$NEW" "$OLD"; then
             rm -rf "$BACKUP"
+            xattr -dr com.apple.quarantine "$OLD" 2>/dev/null
             echo "$(date '+%F %T') скрипт: новая версия установлена"
           else
             echo "$(date '+%F %T') скрипт: замена не удалась, возвращаю прежнюю версию"
@@ -344,7 +374,7 @@ final class Updater {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sh")
         p.arguments = [scriptURL.path, String(ProcessInfo.processInfo.processIdentifier),
-                       Bundle.main.bundleURL.path, newApp.path, log.path]
+                       Self.installURL.path, newApp.path, log.path]
         p.standardInput = FileHandle.nullDevice
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice

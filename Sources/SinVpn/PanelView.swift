@@ -29,9 +29,8 @@ struct PanelView: View {
     }
 
     private func title(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(.caption2.weight(.semibold))
-            .kerning(0.6)
+        Text(text)
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
             .padding(.bottom, 6)
     }
@@ -186,6 +185,7 @@ struct PanelView: View {
         HStack(spacing: 8) {
             Text(updater.statusLine)
                 .monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
                 .foregroundStyle(updater.isFailed ? Color.red : Color.primary)
                 .help(updater.failureDetails ?? "")
             Spacer(minLength: 0)
