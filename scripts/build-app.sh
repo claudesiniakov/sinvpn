@@ -39,7 +39,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
   <key>CFBundleDevelopmentRegion</key><string>ru</string>
-  <key>LSMinimumSystemVersion</key><string>27.0</string>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>

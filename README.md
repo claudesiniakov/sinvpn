@@ -17,7 +17,7 @@
 
 ## Требования
 
-- Mac на Apple Silicon, macOS 27 или новее.
+- Mac на Apple Silicon, macOS 14 или новее.
 
 ## Установка
 

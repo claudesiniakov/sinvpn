@@ -1,8 +1,7 @@
 // swift-tools-version:5.10
 import PackageDescription
 
-// Минимальная версия системы для запуска (macOS 27) задаётся в Info.plist (scripts/build-app.sh).
-// Здесь — минимальная версия SDK, с которой пакет компилируется.
+// Минимальная версия системы — macOS 14; она же продублирована в Info.plist (scripts/build-app.sh).
 let package = Package(
     name: "SinVpn",
     platforms: [.macOS(.v14)],
